@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Loan Tracker - Sajjad & Faruque</title>
+    <title>BINIMOY - Loan Tracker</title>
     <style>
         :root {
             --primary: #4361ee;
@@ -155,6 +155,12 @@
             font-weight: bold;
         }
         
+        .target-info {
+            font-size: 14px;
+            color: var(--gray);
+            margin-top: 10px;
+        }
+        
         .transaction-form {
             background: white;
             border-radius: 10px;
@@ -291,7 +297,7 @@
 <body>
     <div id="login-page" class="login-container">
         <div class="login-box">
-            <h2 class="login-title">Loan Tracker Login</h2>
+            <h2 class="login-title">BINIMOY Login</h2>
             <select id="user-select" class="login-input">
                 <option value="">Select User</option>
                 <option value="Sajjad Hossain">Sajjad Hossain</option>
@@ -316,13 +322,17 @@
         
         <div class="target-container">
             <div class="target-title">
-                <span>Target: ৳800,000</span>
+                <span>Target: ৳1,000,000 (৳800,000 + ৳200,000)</span>
                 <span id="progress-percentage">0%</span>
             </div>
             <div class="progress-container">
                 <div class="progress-bar" id="progress-bar" style="width: 0%;">
                     <div class="progress-text" id="progress-text">৳0</div>
                 </div>
+            </div>
+            <div class="target-info">
+                <div>Mandatory: ৳800,000 | Optional: ৳200,000</div>
+                <div id="target-status">Remaining: ৳800,000 (100%)</div>
             </div>
         </div>
         
@@ -365,7 +375,9 @@
         let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
         let currentUser = null;
         let editIndex = -1;
-        const TARGET_AMOUNT = 800000;
+        const MANDATORY_TARGET = 800000;
+        const OPTIONAL_TARGET = 200000;
+        const TOTAL_TARGET = MANDATORY_TARGET + OPTIONAL_TARGET;
         
         // DOM Elements
         const loginPage = document.getElementById('login-page');
@@ -387,6 +399,7 @@
         const progressBar = document.getElementById('progress-bar');
         const progressText = document.getElementById('progress-text');
         const progressPercentage = document.getElementById('progress-percentage');
+        const targetStatus = document.getElementById('target-status');
         
         // Initialize date
         dateInput.valueAsDate = new Date();
@@ -566,11 +579,22 @@
         
         function updateProgress() {
             const total = transactions.reduce((sum, t) => sum + t.amount, 0);
-            const percentage = Math.min((total / TARGET_AMOUNT) * 100, 100);
+            const percentage = Math.min((total / TOTAL_TARGET) * 100, 100);
             
             progressBar.style.width = `${percentage}%`;
             progressText.textContent = `৳${total.toLocaleString()}`;
             progressPercentage.textContent = `${percentage.toFixed(1)}%`;
+            
+            // Calculate remaining amounts
+            const remainingMandatory = Math.max(0, MANDATORY_TARGET - total);
+            const remainingOptional = Math.max(0, TOTAL_TARGET - total);
+            
+            // Update target status
+            if (total >= MANDATORY_TARGET) {
+                targetStatus.innerHTML = `Mandatory target completed! | Optional remaining: ৳${Math.max(0, TOTAL_TARGET - total).toLocaleString()}`;
+            } else {
+                targetStatus.innerHTML = `Remaining mandatory: ৳${remainingMandatory.toLocaleString()} (${((remainingMandatory/MANDATORY_TARGET)*100).toFixed(1)}%)`;
+            }
         }
     </script>
 </body>
