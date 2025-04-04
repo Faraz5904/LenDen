@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BINIMOY </title>
+    <title>BINIMOY - Loan Tracker</title>
     <style>
         :root {
             --primary: #4361ee;
@@ -121,44 +121,70 @@
             margin-bottom: 20px;
             box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
         }
-        
+
         .target-title {
-            font-size: 16px;
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
+            font-size: 18px;
+            margin-bottom: 12px;
+            color: var(--dark);
+            font-weight: 600;
         }
-        
+
+        .target-amounts {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .target-box {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+
+        .target-box.mandatory {
+            border-left: 4px solid var(--primary);
+        }
+
+        .target-box.optional {
+            border-left: 4px solid var(--success);
+        }
+
+        .target-label {
+            font-size: 14px;
+            color: var(--gray);
+            margin-bottom: 5px;
+        }
+
+        .target-value {
+            font-weight: 600;
+            font-size: 16px;
+        }
+
         .progress-container {
             height: 20px;
             background: #e9ecef;
             border-radius: 10px;
-            margin: 10px 0;
+            margin: 15px 0 10px;
             overflow: hidden;
         }
-        
-        .progress-bar {
-            height: 100%;
-            background: linear-gradient(90deg, var(--success), var(--primary));
-            border-radius: 10px;
-            transition: width 0.5s ease;
-            position: relative;
-        }
-        
-        .progress-text {
-            position: absolute;
-            right: 5px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: white;
-            font-size: 11px;
-            font-weight: bold;
-        }
-        
-        .target-info {
+
+        .target-status {
+            margin-top: 12px;
+            padding: 10px;
+            border-radius: 6px;
             font-size: 14px;
-            color: var(--gray);
-            margin-top: 10px;
+            text-align: center;
+        }
+
+        .status-mandatory {
+            background-color: #e3f2fd;
+            color: var(--primary);
+        }
+
+        .status-optional {
+            background-color: #e8f5e9;
+            color: #2e7d32;
         }
         
         .transaction-form {
@@ -286,10 +312,22 @@
             color: rgba(0, 0, 0, 0.3);
         }
         
+        .sync-notice {
+            text-align: center;
+            font-size: 12px;
+            color: var(--gray);
+            margin-top: 10px;
+        }
+        
         @media (max-width: 600px) {
             .form-row {
                 flex-direction: column;
                 gap: 0;
+            }
+            
+            .target-amounts {
+                flex-direction: column;
+                gap: 10px;
             }
         }
     </style>
@@ -321,18 +359,28 @@
         </div>
         
         <div class="target-container">
-            <div class="target-title">
-                <span>Target: ৳1,000,000 (৳800,000 + ৳200,000)</span>
-                <span id="progress-percentage">0%</span>
+            <div class="target-title">Payment Target</div>
+            
+            <div class="target-amounts">
+                <div class="target-box mandatory">
+                    <div class="target-label">Mandatory Target</div>
+                    <div class="target-value">৳800,000</div>
+                </div>
+                <div class="target-box optional">
+                    <div class="target-label">Optional Target</div>
+                    <div class="target-value">৳200,000</div>
+                </div>
             </div>
+            
             <div class="progress-container">
                 <div class="progress-bar" id="progress-bar" style="width: 0%;">
                     <div class="progress-text" id="progress-text">৳0</div>
                 </div>
             </div>
-            <div class="target-info">
-                <div>Mandatory: ৳800,000 | Optional: ৳200,000</div>
-                <div id="target-status">Remaining: ৳800,000 (100%)</div>
+            
+            <div class="target-status" id="target-status">
+                <div>Total Paid: ৳0</div>
+                <div>Remaining mandatory: ৳800,000 (100%)</div>
             </div>
         </div>
         
@@ -363,16 +411,19 @@
             <div class="transactions-list" id="transactions-list">
                 <div style="text-align: center; padding: 20px; color: var(--gray);">No transactions yet</div>
             </div>
+            <div class="sync-notice">Data syncs automatically between both users</div>
         </div>
     </div>
 
     <script>
+        // User data
         const users = {
             'Sajjad Hossain': { password: 'jannat137', role: 'admin', avatar: 'SH' },
             'Faruque Ahmed': { password: 'fabappy4207', role: 'user', avatar: 'FA' }
         };
         
-        let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+        // Initialize transactions from localStorage
+        let transactions = JSON.parse(localStorage.getItem('binimoy_transactions')) || [];
         let currentUser = null;
         let editIndex = -1;
         const MANDATORY_TARGET = 800000;
@@ -404,6 +455,9 @@
         // Initialize date
         dateInput.valueAsDate = new Date();
         
+        // Storage key to prevent conflicts
+        const STORAGE_KEY = 'binimoy_transactions';
+        
         // Login function
         loginBtn.addEventListener('click', () => {
             const username = userSelect.value;
@@ -428,8 +482,11 @@
                 app.style.display = 'block';
                 
                 // Load data
-                updateTransactions();
+                loadTransactions();
                 updateProgress();
+                
+                // Start sync interval
+                startSync();
             } else {
                 alert('Invalid password');
             }
@@ -442,7 +499,20 @@
             passwordInput.value = '';
             app.style.display = 'none';
             loginPage.style.display = 'flex';
+            stopSync();
         });
+        
+        // Load transactions from storage
+        function loadTransactions() {
+            const storedData = localStorage.getItem(STORAGE_KEY);
+            transactions = storedData ? JSON.parse(storedData) : [];
+            updateTransactions();
+        }
+        
+        // Save transactions to storage
+        function saveTransactions() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+        }
         
         // Add/edit transaction
         submitBtn.addEventListener('click', () => {
@@ -458,7 +528,8 @@
                 date,
                 transactionId: transactionId || null,
                 confirmed: false,
-                addedBy: currentUser.name
+                addedBy: currentUser.name,
+                timestamp: new Date().getTime() // Add timestamp for sync
             };
             
             if (editIndex >= 0) {
@@ -469,15 +540,14 @@
                 transactions.push(transaction);
             }
             
-            localStorage.setItem('transactions', JSON.stringify(transactions));
+            saveTransactions();
+            updateTransactions();
+            updateProgress();
             
             // Reset form
             amountInput.value = '';
             dateInput.valueAsDate = new Date();
             transactionIdInput.value = '';
-            
-            updateTransactions();
-            updateProgress();
         });
         
         // Update transactions list
@@ -488,46 +558,47 @@
                 return;
             }
             
+            // Sort by date (newest first)
+            transactions.sort((a, b) => new Date(b.date) - new Date(a.date) || b.timestamp - a.timestamp);
+            
             const total = transactions.reduce((sum, t) => sum + t.amount, 0);
             totalAmountDisplay.textContent = `৳${total.toLocaleString()}`;
             
             transactionsList.innerHTML = '';
             
-            transactions
-                .sort((a, b) => new Date(b.date) - new Date(a.date))
-                .forEach((transaction, index) => {
-                    const dateObj = new Date(transaction.date);
-                    const formattedDate = dateObj.toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                    });
-                    
-                    const showConfirmButton = currentUser.name === 'Faruque Ahmed' && !transaction.confirmed;
-                    
-                    const transactionElement = document.createElement('div');
-                    transactionElement.className = 'transaction-item';
-                    transactionElement.innerHTML = `
-                        <div class="transaction-details">
-                            <div class="transaction-amount">৳${transaction.amount.toLocaleString()}</div>
-                            <div class="transaction-date">${formattedDate}</div>
-                            ${transaction.transactionId ? `<div style="font-size: 12px; color: var(--gray); margin-top: 3px;">ID: ${transaction.transactionId}</div>` : ''}
-                            ${transaction.confirmed ? 
-                                '<div style="font-size: 12px; color: var(--success); margin-top: 3px;">Confirmed</div>' : 
-                                '<div style="font-size: 12px; color: var(--danger); margin-top: 3px;">Pending</div>'}
-                            <div class="proof-watermark">Paid on: ${formattedDate}</div>
-                        </div>
-                        <div class="transaction-actions">
-                            ${currentUser.role === 'admin' ? `
-                                <button class="edit-btn" data-index="${index}">Edit</button>
-                                <button class="delete-btn" data-index="${index}">Delete</button>
-                            ` : ''}
-                            ${showConfirmButton ? `<button class="confirm-btn" data-index="${index}">Confirm</button>` : ''}
-                        </div>
-                    `;
-                    
-                    transactionsList.appendChild(transactionElement);
+            transactions.forEach((transaction, index) => {
+                const dateObj = new Date(transaction.date);
+                const formattedDate = dateObj.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
                 });
+                
+                const showConfirmButton = currentUser.name === 'Faruque Ahmed' && !transaction.confirmed;
+                
+                const transactionElement = document.createElement('div');
+                transactionElement.className = 'transaction-item';
+                transactionElement.innerHTML = `
+                    <div class="transaction-details">
+                        <div class="transaction-amount">৳${transaction.amount.toLocaleString()}</div>
+                        <div class="transaction-date">${formattedDate}</div>
+                        ${transaction.transactionId ? `<div style="font-size: 12px; color: var(--gray); margin-top: 3px;">ID: ${transaction.transactionId}</div>` : ''}
+                        ${transaction.confirmed ? 
+                            '<div style="font-size: 12px; color: var(--success); margin-top: 3px;">Confirmed</div>' : 
+                            '<div style="font-size: 12px; color: var(--danger); margin-top: 3px;">Pending</div>'}
+                        <div class="proof-watermark">Paid on: ${formattedDate}</div>
+                    </div>
+                    <div class="transaction-actions">
+                        ${currentUser.role === 'admin' ? `
+                            <button class="edit-btn" data-index="${index}">Edit</button>
+                            <button class="delete-btn" data-index="${index}">Delete</button>
+                        ` : ''}
+                        ${showConfirmButton ? `<button class="confirm-btn" data-index="${index}">Confirm</button>` : ''}
+                    </div>
+                `;
+                
+                transactionsList.appendChild(transactionElement);
+            });
             
             // Add event listeners
             document.querySelectorAll('.edit-btn').forEach(btn => {
@@ -556,7 +627,7 @@
         function deleteTransaction(index) {
             if (confirm('Are you sure you want to delete this transaction?')) {
                 transactions.splice(index, 1);
-                localStorage.setItem('transactions', JSON.stringify(transactions));
+                saveTransactions();
                 updateTransactions();
                 updateProgress();
                 
@@ -572,7 +643,9 @@
         
         function confirmTransaction(index) {
             transactions[index].confirmed = true;
-            localStorage.setItem('transactions', JSON.stringify(transactions));
+            transactions[index].confirmedBy = currentUser.name;
+            transactions[index].confirmedAt = new Date().getTime();
+            saveTransactions();
             updateTransactions();
             updateProgress();
         }
@@ -583,7 +656,6 @@
             
             progressBar.style.width = `${percentage}%`;
             progressText.textContent = `৳${total.toLocaleString()}`;
-            progressPercentage.textContent = `${percentage.toFixed(1)}%`;
             
             // Calculate remaining amounts
             const remainingMandatory = Math.max(0, MANDATORY_TARGET - total);
@@ -591,9 +663,48 @@
             
             // Update target status
             if (total >= MANDATORY_TARGET) {
-                targetStatus.innerHTML = `Mandatory target completed! | Optional remaining: ৳${Math.max(0, TOTAL_TARGET - total).toLocaleString()}`;
+                targetStatus.className = 'target-status status-optional';
+                targetStatus.innerHTML = `
+                    <div>Total Paid: <strong>৳${total.toLocaleString()}</strong></div>
+                    <div>🎉 Mandatory target completed!</div>
+                    <div>Optional remaining: <strong>৳${remainingOptional.toLocaleString()}</strong></div>
+                `;
             } else {
-                targetStatus.innerHTML = `Remaining mandatory: ৳${remainingMandatory.toLocaleString()} (${((remainingMandatory/MANDATORY_TARGET)*100).toFixed(1)}%)`;
+                targetStatus.className = 'target-status status-mandatory';
+                targetStatus.innerHTML = `
+                    <div>Total Paid: <strong>৳${total.toLocaleString()}</strong></div>
+                    <div>Remaining mandatory: <strong>৳${remainingMandatory.toLocaleString()}</strong></div>
+                    <div>Progress: <strong>${((total/MANDATORY_TARGET)*100).toFixed(1)}%</strong></div>
+                `;
+            }
+        }
+        
+        // Data synchronization between tabs/users
+        let syncInterval;
+        
+        function startSync() {
+            // Check for changes every 2 seconds
+            syncInterval = setInterval(() => {
+                const storedData = localStorage.getItem(STORAGE_KEY);
+                if (storedData && JSON.stringify(transactions) !== storedData) {
+                    loadTransactions();
+                    updateProgress();
+                }
+            }, 2000);
+            
+            // Also listen for storage events
+            window.addEventListener('storage', handleStorageEvent);
+        }
+        
+        function stopSync() {
+            clearInterval(syncInterval);
+            window.removeEventListener('storage', handleStorageEvent);
+        }
+        
+        function handleStorageEvent(e) {
+            if (e.key === STORAGE_KEY) {
+                loadTransactions();
+                updateProgress();
             }
         }
     </script>
