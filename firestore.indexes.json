@@ -1,0 +1,33 @@
+{
+    "indexes": [
+      {
+        "collectionGroup": "transactions",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "date",
+            "order": "DESCENDING"
+          },
+          {
+            "fieldPath": "timestamp",
+            "order": "DESCENDING"
+          }
+        ]
+      },
+      {
+        "collectionGroup": "transactions",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "amount",
+            "order": "DESCENDING"
+          },
+          {
+            "fieldPath": "date",
+            "order": "ASCENDING"
+          }
+        ]
+      }
+    ],
+    "fieldOverrides": []
+  }
